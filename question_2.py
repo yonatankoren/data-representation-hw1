@@ -203,6 +203,10 @@ We see that as D increases, the MSE increases as well. This is because larger D 
 """
 
 if __name__ == "__main__":
+<<<<<<< HEAD
+=======
+    # Replace 'input_image.png' with the path to your actual grayscale image
+>>>>>>> 4a237bf296aa9babf065698afb5182476f4fdac4
     # For the assignment, make sure the image is at least 512x512
     img_path = '5.gif' 
     
@@ -212,17 +216,31 @@ if __name__ == "__main__":
         print("Please set 'img_path' in the main block to a valid image file.")
     else:
         print("--- Running MSE Analysis ---")
+<<<<<<< HEAD
         # Plot MSE graph
         plot_error_vs_d(img_path, sense='mse')
         
         # Show visual results for MSE
+=======
+        # 1. Plot MSE graph
+        plot_error_vs_d(img_path, sense='mse')
+        
+        # 2. Show visual results for MSE
+>>>>>>> 4a237bf296aa9babf065698afb5182476f4fdac4
         display_sampled_images(img_path, sense='mse')
         display_reconstructed_images(img_path, sense='mse')
 
         print("\n--- Running MAD Analysis ---")
+<<<<<<< HEAD
         # Plot MAD graph
         plot_error_vs_d(img_path, sense='mad')
         
         # Show visual results for MAD
+=======
+        # 3. Plot MAD graph
+        plot_error_vs_d(img_path, sense='mad')
+        
+        # 4. Show visual results for MAD
+>>>>>>> 4a237bf296aa9babf065698afb5182476f4fdac4
         display_sampled_images(img_path, sense='mad')
         display_reconstructed_images(img_path, sense='mad')
