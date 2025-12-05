@@ -202,8 +202,8 @@ def plot_quantization_levels(image_path):
         None (displays a plot)
     """
     # Create subplots for each b value
-    b_values = list(range(1, 9))
-    num_plots = 8
+    b_values = [1, 2, 4, 8]
+    num_plots = len(b_values)
     _, axes = plt.subplots(1, num_plots, figsize=(5 * num_plots, 5))
     
     # Handle case where there's only one subplot
@@ -504,4 +504,25 @@ def max_lloyd_quantization(image_path, b, epsilon=1e-6):
     quantized_img = quantized_img.astype(np.uint8)
     
     return quantized_img
+
+
+if __name__ == "__main__":
+    # Path to the image file
+    image_path = "5.gif"
+    
+    print("Generating plots for uniform quantization...")
+    # Plot MSE vs bits for uniform quantization
+    plot_mse_vs_bits_uniform(image_path)
+    
+    # Plot quantization levels for uniform quantization
+    plot_quantization_levels(image_path)
+    
+    print("Generating plots for Max-Lloyd quantization...")
+    # Plot MSE vs bits for Max-Lloyd quantization
+    plot_mse_vs_bits_max_lloyd(image_path)
+    
+    # Plot quantization levels for Max-Lloyd quantization
+    plot_quantization_levels_max_lloyd(image_path)
+    
+    print("All plots generated!")
 
