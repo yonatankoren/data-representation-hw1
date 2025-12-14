@@ -94,7 +94,7 @@ def plot_error_vs_d(filepath, sense='mse'):
 
     original = _load_and_validate_image(filepath)
 
-    # Ensure strict 512x512 crop for valid comparisons
+    # Ensure strict 512x512 crop
     if original.shape[0] < 512 or original.shape[1] < 512:
         raise ValueError("Image must be at least 512x512.")
     original = original[:512, :512]
@@ -163,6 +163,7 @@ def display_sampled_images(filepath, sense='mse'):
         plt.axis('off')
         
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.4)
     plt.show()
 
 
@@ -195,6 +196,7 @@ def display_reconstructed_images(filepath, sense='mse'):
         plt.axis('off')
         
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.4)
     plt.show()
 
 section_3_answer= """
