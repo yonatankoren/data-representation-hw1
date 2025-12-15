@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.integrate import quad
 
 
 def kronecker_product(matrix_a, matrix_b):
@@ -105,25 +106,62 @@ def walsh_hadamard_matrix(H):
     
     return H_walsh
 
+# Question 3 section E
+def haar_matrix(n):
+    """
+    Generate a Haar matrix of order 2^n × 2^n using recursive construction.
+
+    Args:
+        n: The level parameter, resulting in a 2^n x 2^n matrix.
+        
+    Returns:
+        numpy.ndarray: The unnormalized Haar matrix.
+    """
+    if not isinstance(n, int) or n < 1:
+        raise ValueError("n must be a positive natural number")
+        
+    # Base case: H_2 (for n=1)
+    if n == 1:
+        return np.array([[1, 1], [1, -1]])
+    
+    # Recursive step
+    # Get H_{N} where N is the dimension of the previous level (2^(n-1))
+    H_prev = haar_matrix(n - 1)
+    
+    # Identity matrix of size N = 2^(n-1)
+    I_prev = np.eye(2**(n - 1))
+    
+    # Vectors for Kronecker product
+    # Must be 2D arrays (1x2) for the kronecker_product function to work correctly
+    vec_sum = np.array([[1, 1]])
+    vec_diff = np.array([[1, -1]])
+    
+    # Top block: H_N ⊗ (1, 1)
+    top_block = kronecker_product(H_prev, vec_sum)
+    
+    # Bottom block: I_N ⊗ (1, -1)
+    bottom_block = kronecker_product(I_prev, vec_diff)
+    
+    # Stack vertically
+    haar = np.vstack((top_block, bottom_block))
+    N = 2**n
+    return haar / np.sqrt(N)
+
+
+
 def plot_generic_basis_functions(matrix, n, title_suffix):
     """
     Generic function to plot basis functions derived from a transformation matrix.
     
     Args:
-        matrix: The transformation matrix (Hadamard or Walsh-Hadamard) size N x N.
+        matrix: The transformation matrix (Hadamard, Walsh-Hadamard or Haar) size N x N.
         n: The level parameter (where N = 2^n).
         title_suffix: String to describe the specific matrix given.
     """
     N = 2**n
     
-    # According to Eq (4) and (5), the vector of functions is H.T * vector_v.
-    # The i-th function corresponds to the i-th row of the resulting vector.
-    # This is equivalent to the i-th row of H.T (which is the i-th column of H)
-    # multiplied by the scaling factor sqrt(N).
-    scaling_factor = np.sqrt(N)
-    
     # We transpose the matrix to access columns easily as rows for plotting
-    func_values = matrix.T * scaling_factor
+    func_values = matrix.T
     
     # Prepare time steps for plotting (0 to 1)
     t_steps = np.linspace(0, 1, N + 1)
@@ -155,12 +193,6 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
         ax.set_ylim(-1.5, 1.5)
         ax.grid(True, alpha=0.3)
         ax.axhline(0, color='black', linewidth=0.5, linestyle='--')
-        
-        # Remove axis ticks for cleanliness except on edges
-        if not ax.is_last_row():
-            ax.set_xticklabels([])
-        if not ax.is_first_col():
-            ax.set_yticklabels([])
 
     # Hide unused subplots
     for j in range(i + 1, len(axes_flat)):
@@ -169,6 +201,160 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
     plt.tight_layout()
     plt.subplots_adjust(top=0.90 + (0.01 * (6-n))) # Adjust based on density
     plt.show()
+
+
+
+
+def phi_t(t):
+    """ The target function phi(t) = t * exp(t) """
+    return t * np.exp(t)
+
+
+def get_interval_projections(t_start, t_end, N):
+    """
+    Computes the exact integral of phi(t) over each of the N sub-intervals using quad.
+    Returns vector E where E[i] = int_{bin_i} phi(t) dt.
+    """
+    boundaries = np.linspace(t_start, t_end, N + 1)
+    E_vec = np.zeros(N)
+    
+    for i in range(N):
+        a, b = boundaries[i], boundaries[i+1]
+        # Calculate exact integral of phi(t) on this segment
+        val, _ = quad(phi_t, a, b)
+        E_vec[i] = val
+        
+    return E_vec
+
+def calculate_mse_integration(approx_levels, t_start, t_end):
+    """
+    Calculates MSE = (1/L) * int (phi(t) - approx(t))^2 dt
+    using numerical integration (quad) for high precision.
+    """
+    N = len(approx_levels)
+    boundaries = np.linspace(t_start, t_end, N + 1)
+    L = t_end - t_start
+    total_sse = 0.0
+    
+    for i in range(N):
+        a, b = boundaries[i], boundaries[i+1]
+        level = approx_levels[i]
+        
+        # Define integrand for this segment: (phi(t) - constant_level)^2
+        def integrand(t):
+            return (phi_t(t) - level)**2
+            
+        # Integrate squared error
+        segment_sse, _ = quad(integrand, a, b)
+        total_sse += segment_sse
+        
+    return total_sse / L
+
+def calculate_best_k_term_quad(basis_matrix_small, k, t_start, t_end):
+    """
+    Calculates best k-term approximation using INTEGRATION (Method 1).
+    """
+    N = basis_matrix_small.shape[0]
+    dt = (t_end - t_start) / N
+    
+    # 1. Compute Inner Products <phi, psi_j> via Integration
+    # The basis functions are piecewise constant.
+    # psi_j(t) = v_{ij} on interval i
+    # <phi, psi_j> = sum_i (v_{ij} * int_{interval_i} phi(t) dt)
+    
+    # Get vector of integrals of phi on each bin
+    E_vec_integrals = get_interval_projections(t_start, t_end, N)
+    
+    # Compute dot product (Matrix^T * Integrals)
+    inner_products = basis_matrix_small.T @ E_vec_integrals
+    
+    # 2. Compute Squared Norms ||psi_j||^2 via Integration
+    # ||psi_j||^2 = int psi_j^2 dt = sum_i (v_{ij}^2 * length_of_interval)
+    squared_norms = np.sum(basis_matrix_small**2, axis=0) * dt
+    squared_norms[squared_norms < 1e-12] = 1.0 # Safety
+    
+    # 3. Calculate Coefficients & Sort
+    coeffs = inner_products / squared_norms
+    
+    # Sort by Energy Contribution
+    energy_contributions = (coeffs**2) * squared_norms
+    idx_sorted = np.argsort(energy_contributions)[::-1]
+    top_k_indices = idx_sorted[:k]
+    
+    # Filter
+    coeffs_approx = np.zeros_like(coeffs)
+    coeffs_approx[top_k_indices] = coeffs[top_k_indices]
+    
+    # 4. Reconstruct Approximation (N levels)
+    # The resulting approximation is just a linear combo of basis vectors
+    approx_levels = basis_matrix_small @ coeffs_approx
+    
+    # 5. Calculate MSE via Integration
+    mse = calculate_mse_integration(approx_levels, t_start, t_end)
+    
+    return approx_levels, mse
+
+def run_question_3g():
+    print("\n--- Running Question 3g (Integration Method) ---")
+    
+    n = 2
+    N = 2**n
+    t_start, t_end = -4, 5
+    
+    # Visualization Grids
+    t_boundaries = np.linspace(t_start, t_end, N + 1)
+    t_smooth = np.linspace(t_start, t_end, 500)
+    y_smooth = phi_t(t_smooth)
+    
+    # Generate Bases
+    H_nat = hadamard_matrix(n)
+    H_walsh = walsh_hadamard_matrix(hadamard_matrix(n))
+    H_haar = haar_matrix(n)
+    
+    bases = {
+        "Hadamard": H_nat,
+        "Walsh": H_walsh,
+        "Haar": H_haar
+    }
+    
+    for basis_name, matrix_small in bases.items():
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+        
+        # --- Top Plot ---
+        ax1.set_title(f'Best k-term Approximations: {basis_name}')
+        ax1.plot(t_smooth, y_smooth, label='$\phi(t)$', color='skyblue', linewidth=2, alpha=0.6)
+        
+        k_values = range(1, N + 1)
+        mse_values = []
+        
+        print(f"\nBasis: {basis_name}")
+        for k in k_values:
+            # Calculate using Method 1 (Quad Integration)
+            approx_levels, mse = calculate_best_k_term_quad(matrix_small, k, t_start, t_end)
+            mse_values.append(mse)
+            print(f"  k={k}: MSE={mse:.5f}")
+            
+            # Simple Step Plot
+            y_plot = np.append(approx_levels, approx_levels[-1])
+            ax1.step(t_boundaries, y_plot, where='post', label=f'k={k}', linewidth=1.5)
+            
+        ax1.set_xlabel('t')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        ax1.set_xlim(t_start, t_end)
+        
+        # --- Bottom Plot ---
+        ax2.set_title(f'MSE vs k ({basis_name})')
+        ax2.plot(k_values, mse_values, 'o-', linewidth=2)
+        ax2.set_xlabel('k')
+        ax2.set_ylabel('MSE')
+        ax2.set_xticks(k_values)
+        ax2.grid(True)
+        
+        plt.tight_layout()
+        plt.show()
+
+
 
 # Main
 if __name__ == "__main__":
@@ -181,9 +367,20 @@ if __name__ == "__main__":
         
         # Generate Walsh-Hadamard
         H_walsh = walsh_hadamard_matrix(H_natural)
+
+        # Generate Haar Matrix
+        H_haar = haar_matrix(n)
         
         # Plot Natural Order (Question 3b)
-        plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)")
+        #plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)")
         
         # Plot Sequency Order (Question 3d)
-        plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)")
+        #plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)")
+
+        # Plot Haar Basis Functions (Question 3f)
+        #plot_generic_basis_functions(H_haar, n, "Haar Basis Functions")
+
+        # Run Question 3g
+    run_question_3g()
+
+
