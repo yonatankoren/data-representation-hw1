@@ -54,6 +54,36 @@ def image_histogram(image_path):
 
     return histogram
 
+
+def plot_image_histogram(image_path):
+    """
+    Plot the histogram (probability density) of a grayscale image.
+    
+    Args:
+        image_path: Path to the grayscale image file
+    
+    Returns:
+        None (saves plot to image_histogram.png)
+    """
+    # Get histogram PDF
+    histogram_pdf = image_histogram(image_path)
+    
+    # Gray levels (0 to 255)
+    gray_levels = np.arange(256)
+    
+    # Plot the histogram
+    plt.figure(figsize=(12, 6))
+    plt.bar(gray_levels, histogram_pdf, width=1.0, edgecolor='black', linewidth=0.1)
+    plt.xlabel('Gray Level', fontsize=12)
+    plt.ylabel('Probability Density', fontsize=12)
+    plt.title('Image Histogram', fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3, axis='y')
+    plt.xlim(-0.5, 255.5)
+    plt.tight_layout()
+    plt.savefig('image_histogram.png', dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 # Question 1 section 2
 def uniform_quantization(image_path, b):
     """
