@@ -31,25 +31,23 @@ def image_histogram(image_path):
     Compute the histogram of a grayscale image.
     
     Takes a path to a 512x512 grayscale picture and returns a numpy array
-    with 256 entries, where each entry contains the number of pixels with
+    with 256 entries, where each entry contains the probability of pixels with
     the corresponding gray value (0-255).
     
     Args:
         image_path: Path to the grayscale image file
     
     Returns:
-        numpy.ndarray: Array of 256 integers representing the histogram,
-                      where index i contains the count of pixels with gray value i
+        numpy.ndarray: Array of 256 floats representing the histogram,
+                      where index i contains the probability of pixels with gray value i
     
     Raises:
         FileNotFoundError: If the image file doesn't exist
         ValueError: If the image cannot be loaded or is not grayscale
     """
 
-    # Load and validate the image
     img_array = _load_and_validate_image(image_path)
     
-    # Compute the histogram
     histogram = np.bincount(img_array.flatten(), minlength=256)
 
     histogram = histogram / (512 * 512)
@@ -79,10 +77,10 @@ def uniform_quantization(image_path, b):
     if not isinstance(b, int) or b < 1:
         raise ValueError("b must be a positive natural number")
     
-    # Load and validate the image
     img_array = _load_and_validate_image(image_path, dtype=np.float64)
 
-    if b > 8:
+    # If b >= 8, no quantization is needed.
+    if b >= 8:
         return img_array
     
     # Compute number of quantization levels
@@ -108,14 +106,14 @@ def uniform_quantization(image_path, b):
     return quantized_img
 
 
-def _plot_mse_vs_bits_general(image_path, quantization_func, title_suffix=""):
+def _plot_mse_vs_bits_general(image_path, quantization_func, title_suffix):
     """
     General function to plot MSE vs bits for any quantization algorithm.
     
     Args:
         image_path: Path to the grayscale image file
         quantization_func: Function that takes (image_path, b) and returns quantized image
-        title_suffix: Optional suffix to add to the plot title
+        title_suffix: suffix for the plot title
     
     Returns:
         None (displays a plot)
@@ -129,15 +127,15 @@ def _plot_mse_vs_bits_general(image_path, quantization_func, title_suffix=""):
     mse_values = []
     
     for b in b_values:
-        # Quantize the image using the provided quantization function
+        # Quantize the image using the provided quantization function.
         quantized_img = quantization_func(image_path, b)
         quantized_img_float = quantized_img.astype(np.float64)
         
-        # Calculate MSE: mean of squared differences
+        # Calculate MSE.
         mse = np.mean((original_img_float - quantized_img_float) ** 2)
         mse_values.append(mse)
     
-    # Plot MSE vs b
+    # Plot MSE vs b.
     plt.figure(figsize=(10, 6))
     plt.plot(b_values, mse_values, marker='o', linestyle='-', linewidth=2, markersize=8)
     plt.xlabel('Number of Bits (b)', fontsize=12)
@@ -152,9 +150,10 @@ def _plot_mse_vs_bits_general(image_path, quantization_func, title_suffix=""):
     plt.show()
 
 
+# Question 1 section 2 subsection (a)
 def plot_mse_vs_bits_uniform(image_path):
     """
-    Plot the Mean Squared Error (MSE) between the original image and quantized 
+    Plot the MSE between the original image and quantized 
     image as a function of b (number of bits), for b = 1, ..., 8.
     Uses uniform quantization.
     
@@ -167,9 +166,10 @@ def plot_mse_vs_bits_uniform(image_path):
     _plot_mse_vs_bits_general(image_path, uniform_quantization, "Uniform Quantization")
 
 
+# Question 1 section 4 subsection (a)
 def plot_mse_vs_bits_max_lloyd(image_path, epsilon=1e-6):
     """
-    Plot the Mean Squared Error (MSE) between the original image and quantized 
+    Plot the MSE between the original image and quantized 
     image as a function of b (number of bits), for b = 1, ..., 8.
     Uses Max-Lloyd quantization algorithm.
     
@@ -187,7 +187,8 @@ def plot_mse_vs_bits_max_lloyd(image_path, epsilon=1e-6):
     _plot_mse_vs_bits_general(image_path, max_lloyd_quantization_wrapper, "Max-Lloyd Quantization")
 
 
-def plot_quantization_levels(image_path):
+# Question 1 section 2 subsection (b)
+def plot_quantization_levels_uniform(image_path):
     """
     Plot the decision and representation levels for uniform quantization.
     
@@ -205,10 +206,6 @@ def plot_quantization_levels(image_path):
     b_values = [1, 2, 4, 8]
     num_plots = len(b_values)
     _, axes = plt.subplots(1, num_plots, figsize=(5 * num_plots, 5))
-    
-    # Handle case where there's only one subplot
-    if num_plots == 1:
-        axes = [axes]
     
     # Input values from 0 to 255
     input_values = np.arange(256)
@@ -237,7 +234,8 @@ def plot_quantization_levels(image_path):
     plt.show()
 
 
-def plot_quantization_levels_max_lloyd(image_path, b_values=None, epsilon=1e-6):
+# Question 1 section 4 subsection (b)
+def plot_quantization_levels_max_lloyd(image_path, epsilon=1e-6):
     """
     Plot the decision and representation levels for Max-Lloyd quantization.
     
@@ -247,25 +245,18 @@ def plot_quantization_levels_max_lloyd(image_path, b_values=None, epsilon=1e-6):
     
     Args:
         image_path: Path to the grayscale image file
-        b_values: List of b values to plot. If None, uses [1, 2, 4, 8]
         epsilon: Convergence tolerance for Max-Lloyd algorithm (default: 1e-6)
     
     Returns:
         None (displays a plot)
     """
-    if b_values is None:
-        b_values = [1, 2, 4, 8]
-    
+    b_values = [1, 2, 4, 8]
     # Get histogram PDF from the image
     histogram_pdf = image_histogram(image_path)
     
     # Create subplots for each b value
     num_plots = len(b_values)
-    fig, axes = plt.subplots(1, num_plots, figsize=(5 * num_plots, 5))
-    
-    # Handle case where there's only one subplot
-    if num_plots == 1:
-        axes = [axes]
+    _, axes = plt.subplots(1, num_plots, figsize=(5 * num_plots, 5))
     
     # Input values from 0 to 255
     input_values = np.arange(256)
@@ -316,20 +307,20 @@ def plot_quantization_levels_max_lloyd(image_path, b_values=None, epsilon=1e-6):
     plt.show()
 
 
+# Question 1 section 3
 def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
     """
     Implement the Max-Lloyd algorithm for optimal quantization.
     
     The algorithm iteratively optimizes decision levels and representation levels
-    to minimize Mean Squared Error (MSE). It alternates between:
-    1. Computing representation levels (centroids) given decision levels
+    to minimize the MSE. It alternates between:
+    1. Computing representation levels given decision levels
     2. Updating decision levels as midpoints between representation levels
     
     Args:
         histogram_pdf: Array of length 256 representing the probability density
-                      function (PDF) of pixel values. Should be normalized (sum to 1)
-                      or represent counts that will be normalized internally.
-        initial_decision_levels: Array of initial decision levels (boundaries).
+                      function (PDF) of pixel values. Should be normalized (sum to 1).
+        initial_decision_levels: Array of initial decision levels.
                                 First element should be 0, last should be 256.
         epsilon: Convergence tolerance. Algorithm stops when MSE improvement < epsilon.
                 Must be > 0.
@@ -338,7 +329,6 @@ def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
         tuple: (converged_decision_levels, converged_representation_levels)
                - converged_decision_levels: Final decision levels
                - converged_representation_levels: Final representation levels
-                 (centroids for each quantization bin)
     
     Raises:
         ValueError: If epsilon <= 0 or if inputs are invalid
@@ -346,13 +336,9 @@ def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
     if epsilon <= 0:
         raise ValueError("epsilon must be greater than 0")
     
-    # Normalize histogram to PDF if needed
     pdf = np.array(histogram_pdf, dtype=np.float64)
-    pdf_sum = np.sum(pdf)
-    if pdf_sum > 0:
-        pdf = pdf / pdf_sum
     
-    # Ensure PDF has 256 elements (for pixel values 0-255)
+    # Ensure PDF has 256 elements .
     if len(pdf) != 256:
         raise ValueError("histogram_pdf must have length 256")
     
@@ -372,12 +358,10 @@ def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
     max_iterations = 1000  # Safety limit
     
     while iteration < max_iterations:
-        # Step 1: Calculate representation levels (centroids) for each bin
+        # Step 1: Calculate representation levels for each bin
         representation_levels = np.zeros(num_levels)
         
         for i in range(num_levels):
-            # Find pixels in bin i: decision_levels[i] <= pixel < decision_levels[i+1]
-            # For discrete values, we use: floor(decision_levels[i]) <= pixel < ceil(decision_levels[i+1])
             # Find pixels in bin i: decision_levels[i] <= pixel < decision_levels[i+1]
             # For discrete values, use floor if fractional part <= 0.5, ceil otherwise
             lower_bound = int(np.floor(decision_levels[i]) if (decision_levels[i] - np.floor(decision_levels[i])) <= 0.5 else np.ceil(decision_levels[i]))
@@ -388,15 +372,15 @@ def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
             upper_bound = max(1, min(upper_bound, 256))
             
             # Get pixels in this bin
-            bin_mask = (pixel_values >= lower_bound) & (pixel_values <= upper_bound)
+            bin_mask = (pixel_values >= lower_bound) & (pixel_values < upper_bound)
             bin_pixels = pixel_values[bin_mask]
             bin_pdf = pdf[bin_mask]
             
-            # Calculate centroid (weighted mean)
+            # Calculate weighted mean of pixels in this bin.
             if np.sum(bin_pdf) > 0:
                 representation_levels[i] = np.sum(bin_pixels * bin_pdf) / np.sum(bin_pdf)
             else:
-                # If bin is empty, use midpoint of decision levels
+                # If bin is empty, use midpoint of decision levels.
                 representation_levels[i] = (decision_levels[i] + decision_levels[i+1]) / 2.0
         
         # Step 2: Update decision levels as midpoints between representation levels
@@ -437,6 +421,7 @@ def max_lloyd_algorithm(histogram_pdf, initial_decision_levels, epsilon):
     return decision_levels, representation_levels
 
 
+# Question 1 section 4 
 def max_lloyd_quantization(image_path, b, epsilon=1e-6):
     """
     Apply Max-Lloyd algorithm to quantize an image.
@@ -506,6 +491,12 @@ def max_lloyd_quantization(image_path, b, epsilon=1e-6):
     return quantized_img
 
 
+section_4_subsection_c_answer = """
+    There are two phenomena that can be seen from the graphs of the MSE vs bits: 
+        First, when b is large (b >= 5) the MSE is zero for both quantization algorithms. The reason is that   
+""" 
+
+
 if __name__ == "__main__":
     # Path to the image file
     image_path = "5.gif"
@@ -515,7 +506,7 @@ if __name__ == "__main__":
     plot_mse_vs_bits_uniform(image_path)
     
     # Plot quantization levels for uniform quantization
-    plot_quantization_levels(image_path)
+    plot_quantization_levels_uniform(image_path)
     
     print("Generating plots for Max-Lloyd quantization...")
     # Plot MSE vs bits for Max-Lloyd quantization
