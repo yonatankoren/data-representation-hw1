@@ -50,7 +50,7 @@ def hadamard_matrix(n):
     A Hadamard matrix is a square matrix with entries ±1 whose rows are 
     mutually orthogonal. The recursive construction uses:
     - Base case: H(1) = [[1, 1], [1, -1]]
-    - Recursive case: H(n) = H(1) ⊗ H(n-1)
+    - Recursive case: H(n) = H(1) Kronecker with H(n-1)
     
     Args:
         n: Positive natural number representing the order (2^n × 2^n)
@@ -70,7 +70,7 @@ def hadamard_matrix(n):
     if n == 1:
         return h1
     
-    # Recursive case: H(n) = H(1) ⊗ H(n-1)
+    # Recursive case: H(n) = H(1) kronecker with H(n-1)
     
     h_prev = hadamard_matrix(n - 1)
     
@@ -93,9 +93,6 @@ def walsh_hadamard_matrix(H):
     H = np.array(H)
     
     # Calculate the number of sign changes for each row.
-    # np.diff(H, axis=1) computes the difference between adjacent elements.
-    # If adjacent elements are identical (1, 1 or -1, -1), diff is 0.
-    # If they are different (1, -1 or -1, 1), diff is non-zero.
     sign_changes = np.sum(np.diff(H, axis=1) != 0, axis=1)
     
     # Get the indices that would sort the array 'sign_changes' in ascending order.
@@ -109,43 +106,45 @@ def walsh_hadamard_matrix(H):
 # Question 3 section E
 def haar_matrix(n):
     """
-    Generate a Haar matrix of order 2^n × 2^n using recursive construction.
-
-    Args:
-        n: The level parameter, resulting in a 2^n x 2^n matrix.
-        
-    Returns:
-        numpy.ndarray: The unnormalized Haar matrix.
+    Generate a Haar matrix of order 2^n x 2^n using recursive construction.
+    (Normalized so that rows are orthonormal).
     """
     if not isinstance(n, int) or n < 1:
         raise ValueError("n must be a positive natural number")
         
-    # Base case: H_2 (for n=1)
+    # Base case: H_2
     if n == 1:
-        return np.array([[1, 1], [1, -1]])
+        # Normalized manually for the base case
+        return np.array([[1, 1], [1, -1]]) / np.sqrt(2)
     
-    # Recursive step
-    # Get H_{N} where N is the dimension of the previous level (2^(n-1))
-    H_prev = haar_matrix(n - 1)
+    # Helper to build unnormalized integer matrix
+    def build_raw_haar(level):
+        if level == 1:
+            return np.array([[1, 1], [1, -1]])
+        
+        H_prev = build_raw_haar(level - 1)
+        I_prev = np.eye(2**(level - 1))
+        
+        vec_sum = np.array([[1, 1]])
+        vec_diff = np.array([[1, -1]])
+        
+        top_block = kronecker_product(H_prev, vec_sum)
+        bottom_block = kronecker_product(I_prev, vec_diff)
+        
+        return np.vstack((top_block, bottom_block))
+
+    # Build the raw matrix (integers 1, -1, 0)
+    raw_haar = build_raw_haar(n)
     
-    # Identity matrix of size N = 2^(n-1)
-    I_prev = np.eye(2**(n - 1))
+    # Normalize rows
+    row_norms = np.linalg.norm(raw_haar, axis=1, keepdims=True)
     
-    # Vectors for Kronecker product
-    # Must be 2D arrays (1x2) for the kronecker_product function to work correctly
-    vec_sum = np.array([[1, 1]])
-    vec_diff = np.array([[1, -1]])
+    # Divide each row by its norm
+    H_normalized = raw_haar / row_norms
+    # Transpose to get columns as basis functions
+    H_columns_normalized = H_normalized.T
     
-    # Top block: H_N ⊗ (1, 1)
-    top_block = kronecker_product(H_prev, vec_sum)
-    
-    # Bottom block: I_N ⊗ (1, -1)
-    bottom_block = kronecker_product(I_prev, vec_diff)
-    
-    # Stack vertically
-    haar = np.vstack((top_block, bottom_block))
-    N = 2**n
-    return haar / np.sqrt(N)
+    return H_columns_normalized
 
 
 
@@ -199,7 +198,7 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
         axes_flat[j].axis('off')
         
     plt.tight_layout()
-    plt.subplots_adjust(top=0.90 + (0.01 * (6-n))) # Adjust based on density
+    plt.subplots_adjust(top=0.80 + (0.01 * (6-n))) # Adjust based on density
     plt.show()
 
 
@@ -229,7 +228,7 @@ def get_interval_projections(t_start, t_end, N):
 def calculate_mse_integration(approx_levels, t_start, t_end):
     """
     Calculates MSE = (1/L) * int (phi(t) - approx(t))^2 dt
-    using numerical integration (quad) for high precision.
+    using numerical integration (quad).
     """
     N = len(approx_levels)
     boundaries = np.linspace(t_start, t_end, N + 1)
@@ -252,50 +251,45 @@ def calculate_mse_integration(approx_levels, t_start, t_end):
 
 def calculate_best_k_term_quad(basis_matrix_small, k, t_start, t_end):
     """
-    Calculates best k-term approximation using INTEGRATION (Method 1).
+    Calculates best k-term approximation using integration.
+    Compute Inner Products <phi, psi_j> via Integration
+    The basis functions are piecewise constant.
+    psi_j(t) = v_{ij} on interval i
+    <phi, psi_j> = sum_i (v_{ij} * int_{interval_i} phi(t) dt)
+
     """
     N = basis_matrix_small.shape[0]
-    dt = (t_end - t_start) / N
-    
-    # 1. Compute Inner Products <phi, psi_j> via Integration
-    # The basis functions are piecewise constant.
-    # psi_j(t) = v_{ij} on interval i
-    # <phi, psi_j> = sum_i (v_{ij} * int_{interval_i} phi(t) dt)
     
     # Get vector of integrals of phi on each bin
     E_vec_integrals = get_interval_projections(t_start, t_end, N)
     
     # Compute dot product (Matrix^T * Integrals)
+    # This results in the vector of inner products <phi, psi_j>
     inner_products = basis_matrix_small.T @ E_vec_integrals
     
-    # 2. Compute Squared Norms ||psi_j||^2 via Integration
-    # ||psi_j||^2 = int psi_j^2 dt = sum_i (v_{ij}^2 * length_of_interval)
-    squared_norms = np.sum(basis_matrix_small**2, axis=0) * dt
-    squared_norms[squared_norms < 1e-12] = 1.0 # Safety
-    
-    # 3. Calculate Coefficients & Sort
-    coeffs = inner_products / squared_norms
-    
-    # Sort by Energy Contribution
-    energy_contributions = (coeffs**2) * squared_norms
-    idx_sorted = np.argsort(energy_contributions)[::-1]
+    # Set Coefficients directly as Inner Products
+    coeffs = inner_products
+
+    # Sort indices by the absolute value of the coefficients (descending)
+    idx_sorted = np.argsort(np.abs(coeffs))[::-1]
     top_k_indices = idx_sorted[:k]
     
-    # Filter
+    # Keep only the top k coefficients, zero out the rest
     coeffs_approx = np.zeros_like(coeffs)
     coeffs_approx[top_k_indices] = coeffs[top_k_indices]
     
-    # 4. Reconstruct Approximation (N levels)
-    # The resulting approximation is just a linear combo of basis vectors
+    # The resulting approximation is the linear combination of basis vectors
     approx_levels = basis_matrix_small @ coeffs_approx
     
-    # 5. Calculate MSE via Integration
+    # Calculate MSE via Integration
     mse = calculate_mse_integration(approx_levels, t_start, t_end)
     
     return approx_levels, mse
+    
+
 
 def run_question_3g():
-    print("\n--- Running Question 3g (Integration Method) ---")
+    print("\n--- Running Question 3g ---")
     
     n = 2
     N = 2**n
@@ -316,8 +310,15 @@ def run_question_3g():
         "Walsh": H_walsh,
         "Haar": H_haar
     }
+
+    # Calculate bin width dt
+    dt = (t_end - t_start) / N
     
-    for basis_name, matrix_small in bases.items():
+    for basis_name, matrix_raw in bases.items():
+
+        col_norms = np.sqrt(np.sum(matrix_raw**2, axis=0) * dt)
+        matrix_small = matrix_raw / col_norms
+
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
         
         # --- Top Plot ---
@@ -329,7 +330,7 @@ def run_question_3g():
         
         print(f"\nBasis: {basis_name}")
         for k in k_values:
-            # Calculate using Method 1 (Quad Integration)
+            # Calculate using quad integration
             approx_levels, mse = calculate_best_k_term_quad(matrix_small, k, t_start, t_end)
             mse_values.append(mse)
             print(f"  k={k}: MSE={mse:.5f}")
@@ -372,15 +373,15 @@ if __name__ == "__main__":
         H_haar = haar_matrix(n)
         
         # Plot Natural Order (Question 3b)
-        #plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)")
+        plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)")
         
         # Plot Sequency Order (Question 3d)
-        #plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)")
+        plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)")
 
         # Plot Haar Basis Functions (Question 3f)
-        #plot_generic_basis_functions(H_haar, n, "Haar Basis Functions")
+        plot_generic_basis_functions(H_haar, n, "Haar Basis Functions")
 
-        # Run Question 3g
+    # Run Question 3g
     run_question_3g()
 
 
