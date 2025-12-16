@@ -138,6 +138,12 @@ def _plot_mse_vs_bits_general(image_path, quantization_func, title_suffix):
     # Plot MSE vs b.
     plt.figure(figsize=(10, 6))
     plt.plot(b_values, mse_values, marker='o', linestyle='-', linewidth=2, markersize=8)
+    
+    # Add MSE values as text labels on the graph
+    for b, mse in zip(b_values, mse_values):
+        plt.text(b, mse, f'{mse:.2f}', fontsize=9, ha='center', va='bottom', 
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7, edgecolor='gray'))
+    
     plt.xlabel('Number of Bits (b)', fontsize=12)
     plt.ylabel('Mean Squared Error (MSE)', fontsize=12)
     title = 'MSE vs Number of Quantization Bits'
@@ -221,8 +227,33 @@ def plot_quantization_levels_uniform(image_path):
         bin_indices = np.clip(bin_indices, 0, t - 1)
         representation_levels = (bin_indices + 0.5) * bin_width
         
+        # Calculate decision levels (boundaries between bins)
+        decision_levels = np.array([i * bin_width for i in range(t + 1)], dtype=np.float64)
+        decision_levels[-1] = 256.0
+        
         # Plot the quantization function
         axes[idx].plot(input_values, representation_levels, linewidth=2)
+        
+        # Mark decision levels with red dots on x-axis and dashed vertical lines
+        for i, dl in enumerate(decision_levels):
+            # Clamp decision level to valid range for plotting
+            dl_plot = min(max(dl, 0), 255)
+            
+            # Find the representation level at this decision level
+            # For decision level at boundary, use the representation level of the bin it starts
+            if i < len(decision_levels) - 1:
+                # This decision level starts bin i
+                rep_level = (i + 0.5) * bin_width
+            else:
+                # Last decision level (256), use the last representation level
+                rep_level = ((t - 1) + 0.5) * bin_width
+            
+            # Plot red dot on x-axis
+            axes[idx].plot(dl_plot, 0, 'ro', markersize=6)
+            
+            # Plot dashed vertical line from x-axis to graph
+            axes[idx].plot([dl_plot, dl_plot], [0, rep_level], 'r--', linewidth=1.5, alpha=0.7)
+        
         axes[idx].set_xlabel('Input Pixel Value', fontsize=11)
         axes[idx].set_ylabel('Representation Level', fontsize=11)
         axes[idx].set_title(f'Quantization Levels (b = {b}, {t} levels)', fontsize=12, fontweight='bold')
@@ -296,6 +327,27 @@ def plot_quantization_levels_max_lloyd(image_path, epsilon=1e-6):
         
         # Plot the quantization function
         axes[idx].plot(input_values, output_levels, linewidth=2)
+        
+        # Mark decision levels with red dots on x-axis and dashed vertical lines
+        for i, dl in enumerate(decision_levels):
+            # Clamp decision level to valid range for plotting
+            dl_plot = min(max(dl, 0), 255)
+            
+            # Find the representation level at this decision level
+            # For decision level at boundary, use the representation level of the bin it starts
+            if i < len(representation_levels):
+                # This decision level starts bin i
+                rep_level = representation_levels[i]
+            else:
+                # Last decision level (256), use the last representation level
+                rep_level = representation_levels[-1]
+            
+            # Plot red dot on x-axis
+            axes[idx].plot(dl_plot, 0, 'ro', markersize=6)
+            
+            # Plot dashed vertical line from x-axis to graph
+            axes[idx].plot([dl_plot, dl_plot], [0, rep_level], 'r--', linewidth=1.5, alpha=0.7)
+        
         axes[idx].set_xlabel('Input Pixel Value', fontsize=11)
         axes[idx].set_ylabel('Representation Level', fontsize=11)
         axes[idx].set_title(f'Max-Lloyd Quantization (b = {b}, {t} levels)', fontsize=12, fontweight='bold')
@@ -492,8 +544,10 @@ def max_lloyd_quantization(image_path, b, epsilon=1e-6):
 
 
 section_4_subsection_c_answer = """
-    There are two phenomena that can be seen from the graphs of the MSE vs bits: 
-        First, when b is large (b >= 5) the MSE is zero for both quantization algorithms. The reason is that   
+    We can observe that the MSE values are much better for Max-Lloyd quantization than for uniform quantization for all b values.
+    When using the uniform quantization algorithm, no optimization is performed in regard to the distribution of the pixel values in the image.
+    On the other hand, the Max-Lloyd algorithm is an optimal quantization algorithm that minimizes the MSE by iteratively optimizing the decision and representation levels.
+    This is why the MSE values are much better for Max-Lloyd quantization than for uniform quantization for all b values.
 """ 
 
 
