@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
+import os
 
 
 def kronecker_product(matrix_a, matrix_b):
@@ -148,19 +149,21 @@ def haar_matrix(n):
 
 
 
-def plot_generic_basis_functions(matrix, n, title_suffix):
+def plot_generic_basis_functions(matrix, n, title_suffix, output_dir=None):
     """
     Generic function to plot basis functions derived from a transformation matrix.
-    
-    Args:
-        matrix: The transformation matrix (Hadamard, Walsh-Hadamard or Haar) size N x N.
-        n: The level parameter (where N = 2^n).
-        title_suffix: String to describe the specific matrix given.
+    Scales the values by sqrt(N) and sets y-axis limits dynamically based on data.
     """
     N = 2**n
     
-    # We transpose the matrix to access columns easily as rows for plotting
-    func_values = matrix.T
+    # Scale values by sqrt(N) to match continuous-time definitions
+    func_values = matrix.T * np.sqrt(N)
+
+    # We use a global max to ensure all subplots share the same scale for comparison
+    max_val = np.max(np.abs(func_values))
+    
+    # Add a small margin (e.g., 20%) so the graph doesn't touch the edges
+    y_limit = max_val * 1.2
     
     # Prepare time steps for plotting (0 to 1)
     t_steps = np.linspace(0, 1, N + 1)
@@ -169,7 +172,7 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
     cols = int(np.ceil(np.sqrt(N)))
     rows = int(np.ceil(N / cols))
     
-    fig, axes = plt.subplots(rows, cols, figsize=(15, 2.5 * rows), sharex=True, sharey=True)
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 3 * rows), sharex=True, sharey=True)
     fig.suptitle(f'Basis Functions for n={n}: {title_suffix}', fontsize=16)
     
     axes_flat = axes.flatten()
@@ -185,11 +188,17 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
         ax.step(t_steps, y_plot, where='post', color='blue', linewidth=1.5)
         
         # Labeling
-        func_name = "hw" if "Walsh" in title_suffix else "h"
+        if "Walsh" in title_suffix:
+            func_name = "hw"
+        elif "Haar" in title_suffix:
+            func_name = "ha"
+        else:
+            func_name = "h"
         ax.set_title(f'${func_name}_{{{i+1}}}(t)$', fontsize=10)
         
         # Styling
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_ylim(-y_limit, y_limit)
+        
         ax.grid(True, alpha=0.3)
         ax.axhline(0, color='black', linewidth=0.5, linestyle='--')
 
@@ -197,9 +206,19 @@ def plot_generic_basis_functions(matrix, n, title_suffix):
     for j in range(i + 1, len(axes_flat)):
         axes_flat[j].axis('off')
         
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.80 + (0.01 * (6-n))) # Adjust based on density
-    plt.show()
+    plt.tight_layout(rect=[0, 0.05, 1, 0.92])
+    
+    if output_dir:
+        # Create a clean filename
+        clean_suffix = title_suffix.replace(" ", "_").replace("(", "").replace(")", "")
+        filename = f"Basis_n{n}_{clean_suffix}.png"
+        save_path = os.path.join(output_dir, filename)
+        
+        plt.savefig(save_path, dpi=150)
+        print(f"Saved: {save_path}")
+        plt.close(fig)  # Close to free memory
+    else:
+        plt.show()
 
 
 
@@ -288,7 +307,7 @@ def calculate_best_k_term_quad(basis_matrix_small, k, t_start, t_end):
     
 
 
-def run_question_3g():
+def run_question_3g(output_dir=None):
     print("\n--- Running Question 3g ---")
     
     n = 2
@@ -353,35 +372,44 @@ def run_question_3g():
         ax2.grid(True)
         
         plt.tight_layout()
-        plt.show()
+        if output_dir:
+            filename = f"MSE_Analysis_{basis_name}.png"
+            save_path = os.path.join(output_dir, filename)
+            plt.savefig(save_path, dpi=150)
+            print(f"Saved: {save_path}")
+            plt.close(fig)
+        else:
+            plt.show()
 
 
 
 # Main
 if __name__ == "__main__":
-    print("Generating plots for n = 2 to 6...")
+    # Define the output folder name
+    OUTPUT_FOLDER = "hw1_q3_figures"
+    
+    # Create the folder if it doesn't exist
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
+        print(f"Created directory: {OUTPUT_FOLDER}")
+    
+    print(f"Generating plots for n = 2 to 6... saving to '{OUTPUT_FOLDER}/'")
+    
     for n in range(2, 7):
         print(f"Processing n={n}...")
         
-        # Generate Standard Hadamard
         H_natural = hadamard_matrix(n)
-        
-        # Generate Walsh-Hadamard
         H_walsh = walsh_hadamard_matrix(H_natural)
-
-        # Generate Haar Matrix
         H_haar = haar_matrix(n)
         
-        # Plot Natural Order (Question 3b)
-        plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)")
-        
-        # Plot Sequency Order (Question 3d)
-        plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)")
+        # Pass the output_dir to the function
+        plot_generic_basis_functions(H_natural, n, "Hadamard (Natural Order)", output_dir=OUTPUT_FOLDER)
+        plot_generic_basis_functions(H_walsh, n, "Walsh-Hadamard (Sign Change Order)", output_dir=OUTPUT_FOLDER)
+        plot_generic_basis_functions(H_haar, n, "Haar Basis Functions", output_dir=OUTPUT_FOLDER)
 
-        # Plot Haar Basis Functions (Question 3f)
-        plot_generic_basis_functions(H_haar, n, "Haar Basis Functions")
-
-    # Run Question 3g
-    run_question_3g()
+    # Run Question 3g with saving
+    run_question_3g(output_dir=OUTPUT_FOLDER)
+    
+    print("\nAll figures have been saved successfully.")
 
 
